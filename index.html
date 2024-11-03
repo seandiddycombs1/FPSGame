@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #gameWorld {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            background-color: #87CEEB;
+        }
+        .target {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.1s ease-out;
+        }
+        .target.linear {
+            background-color: #ff4444;
+        }
+        .target.zigzag {
+            background-color: #ff6b6b;
+        }
+        .target.sine {
+            background-color: #ff4477;
+        }
+        .target.circular {
+            background-color: #ff7744;
+        }
+        .target:hover {
+            filter: brightness(1.2);
+        }
+        .score-popup {
+            position: absolute;
+            color: white;
+            font-weight: bold;
+            font-size: 20px;
+            pointer-events: none;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            animation: floatUp 1s ease-out forwards;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+        #score {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            text-shadow: 2px 2px 2px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        #pattern-scores {
+            position: fixed;
+            top: 60px;
+            left: 20px;
+            color: white;
+            font-size: 16px;
+            text-shadow: 2px 2px 2px rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        #crosshair::before,
+        #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.8);
+        }
+        #crosshair::before {
+            left: 9px;
+            height: 20px;
+            width: 2px;
+        }
+        #crosshair::after {
+            top: 9px;
+            height: 2px;
+            width: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameWorld">
+        <div id="crosshair"></div>
+        <div id="score">Score: <span id="scoreValue">0</span></div>
+        <div id="pattern-scores">
+            Linear: 50 points<br>
+            Zigzag: 100 points<br>
+            Sine: 150 points<br>
+            Circular: 200 points
+        </div>
+    </div>
+
+    <script>
+        const gameWorld = document.getElementById('gameWorld');
+        const scoreValue = document.getElementById('scoreValue');
+        let score = 0;
+        let targets = [];
+        let time = 0;
+
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        const patternScores = {
+            linear: 50,
+            zigzag: 100,
+            sine: 150,
+            circular: 200
+        };
+
+        function createSound(type) {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            switch(type) {
+                case 'linear':
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                    break;
+                case 'zigzag':
+                    oscillator.type = 'square';
+                    oscillator.frequency.setValueAtTime(500, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                    break;
+                case 'sine':
+                    oscillator.type = 'triangle';
+                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+                    break;
+                case 'circular':
+                    oscillator.type = 'sawtooth';
+                    oscillator.frequency.setValueAtTime(700, audioContext.currentTime);
+                    gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    break;
+            }
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.5);
+        }
+
+        function showScorePopup(x, y, points) {
+            const popup = document.createElement('div');
+            popup.className = 'score-popup';
+            popup.textContent = +${points};
+            popup.style.left = ${x}px;
+            popup.style.top = ${y}px;
+            gameWorld.appendChild(popup);
+            setTimeout(() => popup.remove(), 1000);
+        }
+
+        class Target {
+            constructor(pattern = 'linear') {
+                this.element = document.createElement('div');
+                this.element.className = target ${pattern};
+                this.pattern = pattern;
+                this.speed = Math.random() * 0.5 + 0.3;
+                this.startTime = time;
+                this.amplitude = Math.random() * 100 + 50;
+                this.frequency = Math.random() * 0.02 + 0.01;
+                
+                this.position = {
+                    x: -50,
+                    y: Math.random() * (window.innerHeight - 100) + 50
+                };
+                
+                if (pattern === 'circular') {
+                    this.centerY = this.position.y;
+                }
+                
+                this.element.style.left = this.position.x + 'px';
+                this.element.style.top = this.position.y + 'px';
+                
+                this.element.addEventListener('click', () => {
+                    const points = patternScores[this.pattern];
+                    score += points;
+                    scoreValue.textContent = score;
+                    createSound(this.pattern);
+                    showScorePopup(this.position.x, this.position.y, points);
+                    this.remove();
+                });
+                
+                gameWorld.appendChild(this.element);
+            }
+
+            update() {
+                this.position.x += this.speed;
+
+                switch (this.pattern) {
+                    case 'zigzag':
+                        this.position.y += Math.sin(time * 0.1) * 2;
+                        break;
+                    case 'sine':
+                        this.position.y = this.amplitude * Math.sin(this.position.x * this.frequency) + window.innerHeight/2;
+                        break;
+                    case 'circular':
+                        const timeDiff = time - this.startTime;
+                        this.position.y = this.centerY + Math.sin(timeDiff * 0.05) * this.amplitude;
+                        break;
+                }
+
+                this.element.style.left = this.position.x + 'px';
+                this.element.style.top = this.position.y + 'px';
+                
+                if (this.position.x > window.innerWidth + 50) {
+                    this.remove();
+                    return false;
+                }
+                return true;
+            }
+
+            remove() {
+                this.element.style.transform = 'scale(0)';
+                setTimeout(() => {
+                    this.element.remove();
+                }, 100);
+                const index = targets.indexOf(this);
+                if (index > -1) {
+                    targets.splice(index, 1);
+                }
+            }
+        }
+
+        function spawnWave() {
+            const patterns = ['linear', 'zigzag', 'sine', 'circular'];
+            const targetCount = Math.floor(Math.random() * 3) + 2;
+            
+            for (let i = 0; i < targetCount; i++) {
+                setTimeout(() => {
+                    const pattern = patterns[Math.floor(Math.random() * patterns.length)];
+                    targets.push(new Target(pattern));
+                }, i * 200);
+            }
+        }
+
+        setInterval(spawnWave, 2000);
+
+        function gameLoop() {
+            time++;
+            targets = targets.filter(target => target.update());
+            requestAnimationFrame(gameLoop);
+        }
+
+        spawnWave();
+        gameLoop();
+
+        window.addEventListener('resize', () => {
+            targets.forEach(target => {
+                if (target.position.y > window.innerHeight) {
+                    target.position.y = window.innerHeight - 50;
+                    target.element.style.top = target.position.y + 'px';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
