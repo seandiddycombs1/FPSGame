@@ -163,9 +163,9 @@
         function showScorePopup(x, y, points) {
             const popup = document.createElement('div');
             popup.className = 'score-popup';
-            popup.textContent = +${points};
-            popup.style.left = ${x}px;
-            popup.style.top = ${y}px;
+            popup.textContent = `+${points}`;
+            popup.style.left = `${x}px`;
+            popup.style.top = `${y}px`;
             gameWorld.appendChild(popup);
             setTimeout(() => popup.remove(), 1000);
         }
@@ -173,7 +173,7 @@
         class Target {
             constructor(pattern = 'linear') {
                 this.element = document.createElement('div');
-                this.element.className = target ${pattern};
+                this.element.className = `target ${pattern}`;
                 this.pattern = pattern;
                 this.speed = Math.random() * 0.5 + 0.3;
                 this.startTime = time;
